@@ -1,4 +1,4 @@
-﻿# Localized messages
+# Localized messages
 data LocalizedData
 {
     # culture="en-US"
@@ -111,8 +111,26 @@ function Set-TargetResource
             $DNSParameters.Add('CName',$true)
             $DNSParameters.Add('HostNameAlias',$Target)
         }
-        Write-Verbose -Message ($LocalizedData.CreatingDnsRecordMessage -f $Type, $Target, $Zone)
-        Add-DnsServerResourceRecord @DNSParameters
+
+        # Adding PTR Record if it's an A Record
+        if ($Type -eq "ARecord")
+        {
+            $IPAddressArray = $Target.Split(".")
+            $IPAddressFormatted = ($IPAddressArray[2]+"."+$IPAddressArray[1]+"."+$IPAddressArray[0])
+            $ReverseZoneName = $IPAddressFormatted + ".in-addr.arpa"
+            $ReverseZoneRecord = $IPAddressArray[3]
+            $PtrDomainName = $Name + "." + $Zone
+
+            Write-Verbose -Message ($LocalizedData.CreatingDnsRecordMessage -f $PtrDomainName, $ReverseZoneRecord, $ReverseZoneName)
+            Add-DnsServerResourceRecordPtr -Name $ReverseZoneRecord -ZoneName $ReverseZoneName -TimeToLive 01:00:00 -AgeRecord -PtrDomainName $PtrDomainName
+        }
+
+        if ($Type -eq "ARecord" -or $Type -eq "CName")
+        {
+            Write-Verbose -Message ($LocalizedData.CreatingDnsRecordMessage -f $Type, $Target, $Zone)
+            Add-DnsServerResourceRecord @DNSParameters
+        }
+
     }
     elseif ($Ensure -eq 'Absent')
     {
@@ -128,8 +146,28 @@ function Set-TargetResource
         {
             $DNSParameters.Add('RRType','CName')
         }
-        Write-Verbose -Message ($LocalizedData.RemovingDnsRecordMessage -f $Type, $Target, $Zone)
-        Remove-DnsServerResourceRecord @DNSParameters
+
+        if ($Type -eq "ARecord" -or $Type -eq "CName")
+        {
+            Write-Verbose -Message ($LocalizedData.RemovingDnsRecordMessage -f $Type, $Target, $Zone)
+            Remove-DnsServerResourceRecord @DNSParameters
+        }
+
+        # Removing PTR Record if it's an A Record
+        if ($Type -eq "ARecord") 
+        {
+            $IPAddressArray = $Target.Split(".")
+            $IPAddressFormatted = ($IPAddressArray[2]+"."+$IPAddressArray[1]+"."+$IPAddressArray[0])
+            $ReverseZoneName = $IPAddressFormatted + ".in-addr.arpa"
+            $ReverseZoneRecord = $IPAddressArray[3]
+            $PtrDomainName = $Name + "." + $Zone
+
+            $PtrType = "Ptr"
+
+            ## Remove-DnsServerResourceRecord -ZoneName $ReverseZoneName -ComputerName $DNSServer -InputObject $NodePTRRecord -Force
+            Write-Verbose -Message ($LocalizedData.RemovingDnsRecordMessage -f $PtrType, $ReverseZoneRecord, $ReverseZoneName)
+            Remove-DnsServerResourceRecord -Name $ReverseZoneRecord -RRType "Ptr" -ZoneName $ReverseZoneName -Force
+        }
     }
 } #end function Set-TargetResource
 
