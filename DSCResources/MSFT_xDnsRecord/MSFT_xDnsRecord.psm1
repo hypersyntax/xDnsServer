@@ -115,6 +115,17 @@ function Set-TargetResource
         # Adding PTR Record if it's an A Record
         if ($Type -eq "ARecord")
         {
+
+            $IPAddressArray = $Target.Split(".")
+            $NetworkID = ($IPAddressArray[0]+"."+$IPAddressArray[1]+"."+$IPAddressArray[2]+"."+"0/24")
+            $IPAddressFormatted = ($IPAddressArray[2]+"."+$IPAddressArray[1]+"."+$IPAddressArray[0])
+            $ZoneFile = $IPAddressFormatted + ".in-addr.arpa.dns"
+
+            ## Create also a reverse zone
+            # Add-DnsServerPrimaryZone -NetworkID 10.3.0.0/24 -ZoneFile "0.3.10.in-addr.arpa.dns"
+            Write-Verbose ($LocalizedData.AddingZoneMessage -f $ZoneFile);
+            Add-DnsServerPrimaryZone -NetworkID $NetworkID -ZoneFile $ZoneFile -DynamicUpdate 'None' -ErrorAction SilentlyContinue
+
             $IPAddressArray = $Target.Split(".")
             $IPAddressFormatted = ($IPAddressArray[2]+"."+$IPAddressArray[1]+"."+$IPAddressArray[0])
             $ReverseZoneName = $IPAddressFormatted + ".in-addr.arpa"
